@@ -39,6 +39,36 @@ const redisClient = redis.createClient({
 const redisPublisher = redisClient.duplicate();
 
 
+appObj.get('/', (requestObj, responseObj) => {
+    resizeBy.send('Hi');
+});
+
+appObj.get('/values/all', async (requestObj, responseObj) => {
+    const values = await pgClient.query('SELECT * FROM values');
+    responseObj.send(values.rows);
+});
+
+appObj.get('/values/current', async (requestObj, responseObj) => {
+    redisClient.hgetall('values', (err, values) => {
+        responseObj.send(values);
+    });
+});
+
+appObj.post('/values', async (requestObj, responseObj) => {
+    const { index } = requestObj.body;
+    if (index > 40) {
+        return responseObj.status(422).send('Index too high');
+    }
+
+    redisClient.hset('values', index, 'Nothing yet!');
+    redisPublisher.publish('insert', index);
+    pgClient.query('INSERT INTO values(number) VALUES($1)', [index]);
+    responseObj.send({ working: true });
+})
+
+
+
+
 appObj.listen(PORT, () => {
     console.log(`Server is listening on ${PORT}`);
 })
